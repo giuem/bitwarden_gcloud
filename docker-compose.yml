@@ -12,8 +12,7 @@ services:
     depends_on: 
     - proxy
     volumes:
-    - ${PWD}/bitwarden:/data
-    - ${PWD}/utilities/backup.sh:/backup.sh:ro
+    - vaultwarden-data:/data/
     environment:
     - LOG_FILE=/data/bitwarden.log
     - WEBSOCKET_ENABLED=true            # required for websockets
@@ -34,6 +33,33 @@ services:
     - YUBICO_SERVER
     - ORG_CREATION_USERS
     - TZ
+
+  backup:
+    # https://github.com/ttionya/vaultwarden-backup
+    image: ttionya/vaultwarden-backup
+    restart: always
+    depends_on:
+    - bitwarden
+    environment:
+    - RCLONE_REMOTE_NAME
+    - RCLONE_REMOTE_DIR
+    - RCLONE_GLOBAL_FLAG
+    - CRON
+    - ZIP_ENABLE
+    - ZIP_PASSWORD
+    - ZIP_TYPE
+    - BACKUP_FILE_DATE_SUFFIX
+    - BACKUP_KEEP_DAYS
+    - PING_URL
+    - MAIL_SMTP_ENABLE
+    - MAIL_SMTP_VARIABLES
+    - MAIL_TO
+    - MAIL_WHEN_SUCCESS
+    - MAIL_WHEN_FAILURE
+      - TZ
+    volumes:
+    - vaultwarden-data:/bitwarden/data/
+    - vaultwarden-rclone-data:/config/
 
   proxy:
     image: caddy:alpine
@@ -79,3 +105,16 @@ services:
     - WATCHTOWER_CLEANUP=true
     - WATCHTOWER_SCHEDULE
     - TZ
+
+volumes:
+  vaultwarden-data:
+    # Specify the name of the volume where you save the vaultwarden data,
+    # use vaultwarden-data for new users
+    # and bitwardenrs-data for migrated users
+    name: vaultwarden-data
+  vaultwarden-rclone-data:
+    external: true
+    # Specify the name of the volume where you save the rclone configuration,
+    # use vaultwarden-rclone-data for new users
+    # and bitwardenrs-rclone-data for migrated users
+    name: vaultwarden-rclone-data
