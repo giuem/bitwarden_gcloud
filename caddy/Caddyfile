@@ -1,8 +1,4 @@
-{$DOMAIN}:443 {
-  # Caddy on port 443 in container to vaultwarden private instance 
-  # Use it if Caddy exposed to the net 
-  # Doc about automatic HTTPS https://caddyserver.com/docs/automatic-https
-
+:80 {
   log {
 	output file {$LOG_FILE} {
         roll_size 50MiB # https://caddyserver.com/docs/caddyfile/directives/log#log
@@ -11,15 +7,9 @@
     level INFO
   }
 
-  # Uncomment only one of the 2 lines. Depending if you provide your own cert or request one from Let's Encrypt
-  # tls {$SSLCERTIFICATE} {$SSLKEY}
-  tls {$EMAIL}
-
   encode zstd gzip
 
   header / {
-       # Enable HTTP Strict Transport Security (HSTS)
-       Strict-Transport-Security "max-age=31536000;"
        # Enable cross-site filter (XSS) and tell browser to block detected attacks
        X-XSS-Protection "1; mode=block"
        # Disallow the site to be rendered within a frame (clickjacking protection)

@@ -43,31 +43,26 @@ services:
     - BACKUP_RCLONE_CONF
     - BACKUP_RCLONE_DEST
     - TZ
-    command: >
-      sh -c 'if [ -n "$BACKUP" ]; 
-             then 
-               apk --update --no-cache add sqlite
-               ln -sf /proc/1/fd/1 /var/log/backup.log &&
-               sed -i "/ash \\/backup\\.sh /d" /etc/crontabs/root &&
-               echo "$BACKUP_SCHEDULE ash /backup.sh $BACKUP" >> /etc/crontabs/root && 
-               crond -d 8; 
-             fi &&
-             exec /start.sh'
+    # command: >
+    #   sh -c 'if [ -n "$BACKUP" ]; 
+    #          then 
+    #            apk --update --no-cache add sqlite
+    #            ln -sf /proc/1/fd/1 /var/log/backup.log &&
+    #            sed -i "/ash \\/backup\\.sh /d" /etc/crontabs/root &&
+    #            echo "$BACKUP_SCHEDULE ash /backup.sh $BACKUP" >> /etc/crontabs/root && 
+    #            crond -d 8; 
+    #          fi &&
+    #          exec /start.sh'
 
   proxy:
-    # Caddy provides an automatic HTTPS reverse proxy with Let's Encrypt cert provisioning
-    # Uses local Dockerfile to include tzdata package
-    # https://caddyserver.com/
-    build: ./docker/caddy
+    image: caddy:alpine
     restart: always
     container_name: proxy
     volumes:
     - ${PWD}/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     - ${PWD}/caddy/data:/data
-    - caddycerts:/root/.caddy
-    ports:
-    - 80:80                             # Port 80 is necessary for Let's Encrypt ACME
-    - 443:443
+    # ports:
+    # - 80:80
     environment:
     - LOG_FILE=/data/logs/caddy.log
     - ACME_AGREE=true                   # agree to ACME for auto HTTPS
@@ -77,85 +72,19 @@ services:
     labels:
     - "com.centurylinklabs.watchtower.enable=false"
 
-
-  ddns:
-    # This provides a ddclient dynamic dns updating cron which is as simple as running it
-    # and editing the ddns/config/ddclient.conf file
-    # https://github.com/linuxserver/docker-ddclient
-    image: linuxserver/ddclient
+  cloudflared:
+    image: cloudflare/cloudflared
+    container_name: cloudflared
     restart: always
-    container_name: ddns
-    depends_on: 
-    - bitwarden
-    volumes:
-    - ${PWD}/ddns:/config
-    environment:
-    - PUID
-    - PGID
-    - TZ
-
-
-  fail2ban:
-    # Implements fail2ban functionality, banning ips that 
-    # try to bruteforce your vault
-    # https://github.com/dani-garcia/vaultwarden/wiki/Fail2Ban-Setup
-    # https://github.com/crazy-max/docker-fail2ban
-    image: crazymax/fail2ban:latest
-    restart: always
-    container_name: fail2ban
+    user: root
     depends_on:
-    - bitwarden
-    volumes:
-    - ${PWD}/fail2ban:/data
-    - ${PWD}/bitwarden:/bitwarden:ro
-    network_mode: "host"
-    privileged: true
-    cap_add:
-    - NET_ADMIN
-    - NET_RAW
+    - proxy
+    command: tunnel run
     environment:
-    - F2B_DB_PURGE_AGE=30d
-    - F2B_LOG_TARGET=/data/fail2ban.log
-    - F2B_LOG_LEVEL=INFO
-    - F2B_IPTABLES_CHAIN=INPUT
-    - SSMTP_HOST=${SMTP_HOST}
-    - SSMTP_PORT=${SMTP_PORT}
-    - SSMTP_USER=${SMTP_USERNAME}
-    - SSMTP_PASSWORD=${SMTP_PASSWORD}
-    - SSMTP_HOSTNAME=Bitwarden (${DOMAIN})
-    - SSMTP_TLS=${SMTP_TLS}
-    - SSMTP_STARTTLS=YES
+    - TUNNEL_TOKEN
     - TZ
-
-
-  countryblock:
-    # The block script will block any country (defaults to CN and AU)
-    # Requires cap_add as listed and privileged because it uses iptables and ipset
-    # https://hub.docker.com/_/alpine/
-    image: alpine:latest
-    restart: always
-    container_name: countryblock
-    depends_on: 
-    - bitwarden
-    volumes:
-    - ${PWD}/countryblock/block.sh:/block.sh:ro
-    network_mode: "host"
-    privileged: true
-    cap_add:
-    - NET_ADMIN
-    - NET_RAW
-    environment:
-    - COUNTRIES
-    - COUNTRYBLOCK_SCHEDULE
-    - TZ
-    command: >
-      sh -c 'apk --update --no-cache add ipset iptables ip6tables wget bash tzdata &&
-             ln -sf /proc/1/fd/1 /var/log/block.log &&
-             sed -i "/bash \\/block\\.sh update/d" /etc/crontabs/root &&
-             echo "$COUNTRYBLOCK_SCHEDULE bash /block.sh update" >> /etc/crontabs/root &&
-             crond -d 8 &&
-             bash /block.sh start'    
-
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
 
   watchtower:
     # Watchtower will pull down your new image, gracefully shut down your existing container 
@@ -172,7 +101,3 @@ services:
     - WATCHTOWER_CLEANUP=true
     - WATCHTOWER_SCHEDULE
     - TZ
-
-
-volumes:
-  caddycerts:
