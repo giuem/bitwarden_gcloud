@@ -1,4 +1,4 @@
-version: '3'
+version: '3.4'
 
 
 services:
@@ -56,7 +56,7 @@ services:
     - MAIL_TO
     - MAIL_WHEN_SUCCESS
     - MAIL_WHEN_FAILURE
-      - TZ
+    - TZ
     volumes:
     - vaultwarden-data:/bitwarden/data/
     - vaultwarden-rclone-data:/config/
